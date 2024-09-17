@@ -9,6 +9,12 @@ To boost computational efficiency, the code leverages multithreading and C-based
 
 ## Usage
 
+## Acknowledgements
+
+This project is based on the paper:
+
+Josef Grus, Zdeněk Hanzálek, "Automated placement of analog integrated circuits using priority-based constructive heuristic", Computers & Operations Research, Volume 167, 2024, 
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
