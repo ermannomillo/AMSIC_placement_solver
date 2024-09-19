@@ -28,7 +28,7 @@ def convert_keys_to_int(data):
     dict : Dictionary with integer keys.
     """
     
-    if isinstance(d, dict):
+    if isinstance(data, dict):
         return {int(k): convert_keys_to_int(v) for k, v in data.items()}
     return data
 

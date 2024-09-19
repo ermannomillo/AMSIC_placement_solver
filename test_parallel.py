@@ -138,11 +138,11 @@ if __name__ == "__main__":
         # GA execution with profiling
         if save_performance:
             profiling_data = [
-                ['N', 'Childs', 'Crossover prob', 'Mutation prob',  'Elite size', 'Generations', 'Population size', 'GA CPU time', 'Fitness','Date'],
-                [N, s, p_c, p_m, elite_size, generations_ga, population_ga, ga_cpu_time, fitness_ga, dt.datetime.now()]
+                ['N', 'Childs', 'Tournament size', 'Crossover prob', 'Mutation prob',  'Elite size', 'Generations', 'Population size', 'GA CPU time', 'Fitness','Date'],
+                [N, childs, tournament_size, p_c, p_m, elite_size, generations_ga, population_ga, ga_cpu_time, fitness_ga, dt.datetime.now()]
             ]
             iou.save_performance_data('data/GA_profiling_data.csv', profiling_data, 
-                                    ['N', 'Childs', 'Crossover prob', 'Mutation prob',  'Elite size', 'Generations', 'Population size']
+                                    ['N', 'Childs', 'Tournament size', 'Crossover prob', 'Mutation prob',  'Elite size', 'Generations', 'Population size']
                                    )
 
     
@@ -170,7 +170,8 @@ if __name__ == "__main__":
                 R, G_list, E, a, N, W_max, H_max, population_cma, 3 * N + 1, initial_mean, generations_cma, sigma, cost_conn, cost_area, False
             )
             if save_performance:
-                profiling_data = [['N', 'Generations', 'Sigma', 'Population size', 'CMA CPU time','Fitness','Date'],
+                profiling_data = [
+                    ['N', 'Generations', 'Sigma', 'Population size', 'CMA CPU time','Fitness','Date'],
                     [N, generations_cma, sigma, population_cma, cma_cpu_time, fitness_cma, dt.datetime.now()]
                 ]
                 iou.save_performance_data('data/CMA_profiling_data.csv', profiling_data, ['N', 'Generations', 'Sigma', 'Population size'])

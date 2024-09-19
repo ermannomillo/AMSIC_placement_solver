@@ -90,7 +90,11 @@ def deterministic_tournament_selection(population, T):
     -------
     Individual : The selected individual.
     """
+    # Adjust T if it's larger than the population size
+    if T > len(population):
+        T = len(population)
     
+    # Perform tournament selection
     tournament = random.sample(population, T)
     return min(tournament, key=lambda ind: ind.fitness)
 

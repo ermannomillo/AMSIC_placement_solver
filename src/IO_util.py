@@ -6,22 +6,30 @@ import random
 import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import mplcursors
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
-
-
+import fcntl
 
 def save_performance_data(csv_file, performance_data, primary_keys):
-    """Save / update performance data of placement stage """
-    
-    # If the file exists, read it
-    if os.path.exists(csv_file):
-        with open(csv_file, mode='r', newline='') as file:
-            reader = csv.reader(file)
-            data = list(reader)
-        
-        # Extract header from the data
-        header = data[0]
+    """Save / update performance data of placement stage with file locking"""
+
+    # Open the file in read/write mode (will create if it doesn't exist)
+    with open(csv_file, mode='a+', newline='') as file:
+        # Acquire an exclusive lock for writing
+        fcntl.flock(file, fcntl.LOCK_EX)
+
+        # Move to the start of the file for reading
+        file.seek(0)
+
+        # Read existing data
+        reader = csv.reader(file)
+        data = list(reader)
+
+        if data:
+            # Extract header from the data
+            header = data[0]
+        else:
+            # No data present, assume first row is the header from performance_data
+            header = performance_data[0]
+            data.append(header)
 
         # Find the indices of the primary key columns in the header
         primary_key_indices = [header.index(key) for key in primary_keys]
@@ -35,14 +43,17 @@ def save_performance_data(csv_file, performance_data, primary_keys):
         else:
             # Append the new data if no matching row is found
             data.append(performance_data[1])
-    else:
-        # If the file does not exist, create it with the header and profiling data
-        data = performance_data
 
-    # Write data back to the CSV file
-    with open(csv_file, mode='w', newline='') as file:
+        # Truncate the file to ensure no leftover data exists after overwriting
+        file.seek(0)
+        file.truncate()
+
+        # Write updated data back to the CSV file
         writer = csv.writer(file)
         writer.writerows(data)
+
+        # Release the file lock
+        fcntl.flock(file, fcntl.LOCK_UN)
 
 
 
@@ -83,6 +94,8 @@ def plot_placement(G_list, placed, N, W_max, H_max, name):
         ax2.add_patch(rect)
 	
     fig2.savefig(name)
+
+
 
 def plot_evolution_pca(chromosomes_over_time, fitness_over_time, generations, name):
     """Plot evolution of EA via PCA dimensionality reduction tecnique"""
@@ -186,64 +199,3 @@ def plot_3d_with_colorbar(df, x_col, y_col1, y_col2, color_col, title, xlabel, y
 
     # Show the plot
     plt.show()
-
-
-
-def poly_fit(df, label, image_path, max_degree):
-    """Polynomially fit data respect N and label"""
-    
-    df = df.sort_values(by='N').reset_index(drop=True)
-        
-    # Split the data into training and validation sets (80% train, 20% validate)
-    N_train, N_val, y_train, y_val = train_test_split(df['N'], df[label], test_size=0.2, random_state=42)
-        
-    # Define the range of polynomial degrees to test
-    degrees = range(1, max_degree+1)  # Limit the degrees to reduce the chance of overfitting
-        
-    # Initialize variables to store the best degree and its corresponding scores
-    best_degree = None
-    best_val_r2 = -np.inf  # Start with the lowest possible R-squared
-        
-    # Iterate over each degree and compute the fit
-    for degree in degrees:
-        # Fit the polynomial on the training data
-        poly_coeffs = np.polyfit(N_train, y_train, degree)
-            
-        # Evaluate on the validation set
-        y_val_pred = np.polyval(poly_coeffs, N_val)
-            
-        # Calculate R-squared and MSE for the validation set
-        val_r2 = r2_score(y_val, y_val_pred)
-        val_mse = mean_squared_error(y_val, y_val_pred)
-            
-        # Print the degree, R-squared, and MSE
-        print(f'Degree: {degree}, Validation R-squared: {val_r2:.4f}, Validation MSE: {val_mse:.4f}')
-            
-        # Update the best degree if this one is better
-        if val_r2 > best_val_r2:
-            best_val_r2 = val_r2
-            best_degree = degree
-            best_poly_coeffs = poly_coeffs
-
-    # Generate the best fit polynomial on the entire dataset
-    best_poly_vals = np.polyval(best_poly_coeffs, df['N'])
-        
-    # Print the best polynomial equation
-    print("\nBest Polynomial Equation:")
-    poly_eq = " + ".join([f"{coef:.4f}*x^{i}" for i, coef in enumerate(reversed(best_poly_coeffs))])
-    print(f"y = {poly_eq}")
-            
-    # Plot the original data points and the best polynomial fit
-    fig2 = plt.figure(figsize=(10, 6))
-    plt.plot(df['N'], df[label], 'o', label=label)
-    plt.plot(df['N'], best_poly_vals, '-', label=f'Best Polynomial Fit (degree {best_degree})')
-        
-    # Add labels and title
-    plt.xlabel('N')
-    plt.ylabel('CPU Time (s)')
-    plt.title(f'Best Fit Polynomial (degree {best_degree})\nValidation R-squared: {best_val_r2:.4f}')
-    plt.legend()
-    plt.grid(True)
-        
-    fig2.savefig(image_path)
-
