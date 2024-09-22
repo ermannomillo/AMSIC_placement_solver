@@ -16,22 +16,30 @@ class Context:
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     W_max (float) : The maximum allowable width for the layout.
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     """
-    def __init__(self, R, G_list, E, a, N, W_max, H_max, cost_conn, cost_area):
+    def __init__(self, R, G_list, E, a, F, X, N, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
         self.R = R
         self.G_list = G_list
         self.E = E
         self.a = a
+        self.F = F
+        self.X = X
         self.N = N
         self.W_max = W_max
         self.H_max = H_max
         self.cost_conn = cost_conn
         self.cost_area = cost_area
+        self.cost_prox = cost_prox
+        self.cost_face = cost_face
 
 # Define the fitness function
 def fitness_function(chromosome, context):
@@ -54,16 +62,18 @@ def fitness_function(chromosome, context):
     placed_rectangles = [] 
     
     placed = che.heuristic_placement(
-        context.R, context.G_list, context.E, context.a, P, rectangles, placed_rectangles, pm, context.W_max, context.H_max, context.cost_conn, context.cost_area
+        context.R, context.G_list, context.E, context.a, context.F, context.X, P, rectangles, placed_rectangles, pm, context.W_max, context.H_max, context.cost_conn, context.cost_area,  context.cost_prox, context.cost_face
     )
 
     min_width, min_height = deu.find_macrorectangle(placed)
-    connCriteria = deu.conn_HPWL(context.E, placed)
+    L_conn = deu.conn_HPWL(context.E, placed)
+    L_prox = deu.proximity_crit(context.X, placed)
+    L_face = deu.interface_crit(context.F, placed, 0, 0, min_width, min_height)
 
-    return context.cost_area * (min_width + min_height) + context.cost_conn * connCriteria if len(placed) == context.N else 100000
+    return context.cost_area * (min_width + min_height) + context.cost_conn * L_conn  + context.cost_face * L_face +  context.cost_prox * L_prox if len(placed) == context.N else 100000
 
 
-def CMA_algorithm(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area, profile):
+def CMA_algorithm(R, G_list, E, a, F, X, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area, cost_prox, cost_face,  profile):
     """
     Run the CMA-ES to generate and optimize a feasible solution
 
@@ -73,6 +83,8 @@ def CMA_algorithm(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     W_max (float) : The maximum allowable width for the layout.
     H_max (float) : The maximum allowable height for the layout.
@@ -83,6 +95,8 @@ def CMA_algorithm(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_
     sigma (float): Step size parameter for CMA-ES.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     profile (bool): Flag to determine if profiling is enabled.
 
     Returns:
@@ -95,7 +109,7 @@ def CMA_algorithm(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_
 
     fitness_over_time = []
     chromosomes_over_time = []
-    context = Context(R, G_list, E, a, N, W_max, H_max, cost_conn, cost_area)
+    context = Context(R, G_list, E, a, F, X, N, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face)
     
     # Run the optimization loop
     for generation in range(generations):
@@ -123,7 +137,7 @@ def CMA_algorithm(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_
     return es, fitness_over_time, chromosomes_over_time
 
 
-def run_cma(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area, profile):
+def run_cma(R, G_list, E, a, F, X, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area, cost_prox, cost_face, profile):
     """
     Task wrapper to run the CMA-ES algorithm and compute its performance / profiling.
 
@@ -133,6 +147,8 @@ def run_cma(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     W_max (float) : The maximum allowable width for the layout.
     H_max (float) : The maximum allowable height for the layout.
@@ -143,6 +159,8 @@ def run_cma(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length
     sigma (float): Step size parameter for CMA-ES.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     profile (bool): Flag to determine if profiling is enabled.
 
     Returns:
@@ -154,14 +172,14 @@ def run_cma(R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length
 
     # Ensure the algorithm runs only once
     es, fitness_over_time, chromosomes_over_time = CMA_algorithm(
-        R, G_list, E, a, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area, profile
+        R, G_list, E, a, F, X, N, W_max, H_max, population_size, chromosome_length, initial_mean, generations, sigma, cost_conn, cost_area,  cost_prox, cost_face, profile
     )
     
     # Get the best solution and decode it
     solution_cma = es.result.xbest
     fitness_cma = es.result.fbest
     rectangles_cma, pm_cma = deu.decode_chromosome(R, N, solution_cma, W_max, H_max)
-    placed_cma = che.heuristic_placement(R, G_list, E, a, [(0, 0,None)], rectangles_cma, [], pm_cma, W_max, H_max, cost_conn, cost_area)
+    placed_cma = che.heuristic_placement(R, G_list, E, a, F, X, [(0, 0,None)], rectangles_cma, [], pm_cma, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face)
 
     # Time the execution
     end_time = time.process_time()

@@ -16,23 +16,31 @@ class Context:
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     W_max (float) : The maximum allowable width for the layout.
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     """
     
-    def __init__(self, R, G_list, E, a, N, W_max, H_max, cost_conn, cost_area):
+    def __init__(self, R, G_list, E, a, F, X, N, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
         self.R = R
         self.G_list = G_list
         self.E = E
         self.a = a
+        self.F = F
+        self.X = X
         self.N = N
         self.W_max = W_max
         self.H_max = H_max
         self.cost_conn = cost_conn
         self.cost_area = cost_area
+        self.cost_prox = cost_prox
+        self.cost_face = cost_face
 
 
 
@@ -68,13 +76,15 @@ class Individual:
         placed_rectangles = []  
         
         placed = che.heuristic_placement(
-        self.context.R, self.context.G_list, self.context.E, self.context.a, P, rectangles, placed_rectangles, pm, self.context.W_max, self.context.H_max, self.context.cost_conn, self.context.cost_area
+        self.context.R, self.context.G_list, self.context.E, self.context.a, self.context.F, self.context.X, P, rectangles, placed_rectangles, pm, self.context.W_max, self.context.H_max, self.context.cost_conn, self.context.cost_area, self.context.cost_prox, self.context.cost_face
         )
         
         min_width, min_height = deu.find_macrorectangle(placed)
-        connCriteria = deu.conn_HPWL(self.context.E, placed)
+        L_conn = deu.conn_HPWL(self.context.E, placed)
+        L_face = deu.interface_crit(self.context.F, placed, 0, 0, min_width, min_height)
+        L_prox = deu.proximity_crit(self.context.X, placed)
 
-        return self.context.cost_area * (min_width + min_height)+ self.context.cost_conn * connCriteria if len(placed) == self.context.N  else 100000
+        return self.context.cost_area * (min_width + min_height)+ self.context.cost_conn * L_conn + self.context.cost_face * L_face +  self.context.cost_prox * L_prox if len(placed) == self.context.N  else 100000
 
 
 def deterministic_tournament_selection(population, T):
@@ -263,7 +273,7 @@ def generate_children(population, s, p_c, p_m, T, context):
     return L
 
 
-def genetic_algorithm(R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, profile):
+def genetic_algorithm(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, profile):
     """
     Run the genetic algorithm to generate and optimize a feasible solution
 
@@ -273,6 +283,8 @@ def genetic_algorithm(R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generation
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     s (int) : Number of offspring to generate each generation.
     p_c (float) : Crossover probability.
@@ -286,6 +298,8 @@ def genetic_algorithm(R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generation
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     profile (bool): Flag to determine if profiling is enabled.
 
     Returns:
@@ -293,7 +307,7 @@ def genetic_algorithm(R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generation
     tuple: Contains final population, fitness over time, chromosomes over time.
     """
 
-    context = Context(R, G_list, E, a, N, W_max, H_max, cost_conn, cost_area)
+    context = Context(R, G_list, E, a, F, X, N, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face)
 
     population = [Individual(np.random.rand(chromosome_length).tolist(), context) for _ in range(population_size)]
     fitness_over_time = []
@@ -318,7 +332,7 @@ def genetic_algorithm(R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generation
     
     return population, fitness_over_time, chromosomes_over_time
 
-def run_ga(R, G_list, E, a,  N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, profile):
+def run_ga(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, profile):
     """
     Task wrapper to run GA and elaborates performance / profiling
     
@@ -328,6 +342,8 @@ def run_ga(R, G_list, E, a,  N, s, p_c, p_m, elite_size, T, generations, populat
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     s (int) : Number of offspring to generate each generation.
     p_c (float) : Crossover probability.
@@ -341,6 +357,8 @@ def run_ga(R, G_list, E, a,  N, s, p_c, p_m, elite_size, T, generations, populat
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     profile (bool): Flag to determine if profiling is enabled.
 
     Returns:
@@ -350,12 +368,12 @@ def run_ga(R, G_list, E, a,  N, s, p_c, p_m, elite_size, T, generations, populat
     
     start_time = time.process_time()
     final_population, fitness_over_time, chromosomes_over_time = genetic_algorithm(
-        R, G_list, E, a, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, profile
+        R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, profile
     )
     
     solution_ga = min(final_population, key=lambda ind: ind.fitness)
     rectangles_ga, pm_ga = deu.decode_chromosome(R, N, solution_ga.chromosome, W_max, H_max)
-    placed_ga = che.heuristic_placement(R, G_list, E, a, [(0, 0, None)], rectangles_ga, [], pm_ga, W_max, H_max, cost_conn, cost_area)
+    placed_ga = che.heuristic_placement(R, G_list, E, a, F, X, [(0, 0, None)], rectangles_ga, [], pm_ga, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face)
     fitness_ga = solution_ga.fitness
 
     end_time = time.process_time()

@@ -12,6 +12,15 @@ from statsmodels.regression.linear_model import OLS
 from statsmodels.regression.linear_model import GLSAR
 from statsmodels.stats.sandwich_covariance import cov_hac
 from statsmodels.tools.tools import add_constant
+from statsmodels.regression.linear_model import OLS
+from statsmodels.regression.linear_model import GLSAR
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson
+from statsmodels.stats.sandwich_covariance import cov_hac
+from statsmodels.tools.tools import add_constant
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+
 
 
 def poly_fit(df, label, image_path, max_degree):
@@ -146,4 +155,3 @@ def run_gls_with_diagnostics(df, dependent_var, independent_vars, use_glsar=Fals
     
     if cond_number > 30:
         print("\nWarning: High condition number indicates multicollinearity. Consider removing or standardizing variables, or using Ridge regression.")
-

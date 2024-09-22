@@ -16,6 +16,7 @@ import device_util as deu
 import stats_util as stu
 
 
+
 def run_command(command):
     """Task wrapper to run command in parallel."""
     print( f"Running: {command}" )
@@ -95,7 +96,7 @@ if __name__ == "__main__":
     cma_hyperparams = list(product(cma_population_sizes, cma_sigmas))
 
     # Instance sizes to test
-    instance_sizes = [50]
+    instance_sizes = [60]
 
     
     
@@ -173,7 +174,7 @@ if __name__ == "__main__":
     
     iou.plot_3d(df, 'N', 'CMA CPU time', 'Fitness',
                 title='3D Plot: CMA CPU Time, Fitness vs N', 
-                xlabel='N (Problem Size)', ylabel1='CMA CPU Time', ylabel2='Fitness')
+                xlabel='N (Problem Size)', ylabel1='CMA CPU Time [s]', ylabel2='Fitness')
         
     iou.plot_3d(df, 'N', 'Population size', 'Fitness',
                 title='3D Plot: Population size, Fitness vs N', 
@@ -185,7 +186,7 @@ if __name__ == "__main__":
       
     iou.plot_3d_with_colorbar(df, 'N', 'Sigma', 'CMA CPU time', 'Population size',
             title='3D Plot: CMA CPU Time, Sigma, Population size vs N with Color', 
-            xlabel='N (Problem Size)', ylabel1='Sigma', ylabel2='CMA CPU Time')
+            xlabel='N (Problem Size)', ylabel1='Sigma', ylabel2='CMA CPU Time [s]')
    
     
     independent_vars = ['Population size', 'Sigma', 'N']
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     
     iou.plot_3d(df, 'N', 'GA CPU time', 'Fitness',
                 title='3D Plot: GA CPU Time, Fitness vs N', 
-                xlabel='N (Problem Size)', ylabel1='GA CPU Time', ylabel2='Fitness')
+                xlabel='N (Problem Size)', ylabel1='GA CPU Time [s]', ylabel2='Fitness')
         
     iou.plot_3d(df, 'N', 'Population size', 'Fitness',
                 title='3D Plot: Population size, Fitness vs N', 
@@ -227,21 +228,21 @@ if __name__ == "__main__":
 
     iou.plot_3d(df, 'N', 'Population size', 'GA CPU time',
                 title='3D Plot: Population size, GA CPU time vs N', 
-                xlabel='N (Problem Size)', ylabel1='Population size', ylabel2='GA CPU time')
+                xlabel='N (Problem Size)', ylabel1='Population size', ylabel2='GA CPU time [s]')
         
     iou.plot_3d(df, 'N', 'Elite size', 'GA CPU time',
                 title='3D Plot: Elite size, GA CPU time vs N', 
-                xlabel='N (Problem Size)', ylabel1='Elite size', ylabel2='GA CPU time')
+                xlabel='N (Problem Size)', ylabel1='Elite size', ylabel2='GA CPU time [s]')
         
     iou.plot_3d(df, 'N', 'Childs', 'GA CPU time',
                 title='3D Plot: Childs, GA CPU time vs N', 
-                xlabel='N (Problem Size)', ylabel1='Childs', ylabel2='GA CPU time')
+                xlabel='N (Problem Size)', ylabel1='Childs', ylabel2='GA CPU time [s]')
 
     iou.plot_3d(df, 'N', 'Tournament size', 'GA CPU time',
                 title='3D Plot: Tournament size, GA CPU time vs N', 
-                xlabel='N (Problem Size)', ylabel1='Tournament size', ylabel2='GA CPU time')
+                xlabel='N (Problem Size)', ylabel1='Tournament size', ylabel2='GA CPU time [s]')
 
-    independent_vars = ['Population size', 'Elite size', 'N', 'Tournament size', 'Childs']
+    independent_vars = ['Population size', 'N', 'Childs']
     dependent_var_1 = 'GA CPU time'
     dependent_var_2 = 'Fitness'
     
@@ -266,6 +267,3 @@ if __name__ == "__main__":
     df = pd.read_csv('data/LP_profiling_data.csv')
     stu.poly_fit(df, 'Gurobi CPU time', 'images/LP_fit.png', 7)
     
-
-      
-            

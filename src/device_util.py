@@ -216,9 +216,16 @@ def init_rectangles_random(N, W_max, H_max, SEED):
     for i in range(N):
         for j in range(N):
             a[i][j] = a[j][i]
+
+    F = {}
+    F[0] = [0, 1, uniform(0, 10) ]
+    F[1] = [1, 3, uniform(0, 10) ]
+    
+    X = {}
+    X[0] = [ 2, 3, uniform(-10, 10)]
     
     
-    return R, G_list, a
+    return R, G_list, a, F, X
 
 
 
@@ -388,7 +395,7 @@ def conn_HPWL_C(E_len, E_indices_ptr, E_costs, placed):
     
     Returns:
     -------
-    int : Total HPWL for the given placement.
+    int : Total normalized HPWL for the given placement.
     """
 
     # Prepare the placed array to be C param
@@ -398,7 +405,6 @@ def conn_HPWL_C(E_len, E_indices_ptr, E_costs, placed):
     # Call the C function
     return C.conn_HPWL(E_len, E_indices_ptr, E_costs, placed_len, placed_array)
 
-    
 
 def conn_HPWL(E, placed ):
     """
@@ -411,7 +417,7 @@ def conn_HPWL(E, placed ):
 
     Returns:
     -------
-    int : Total HPWL for the given placement.
+    int : Total normalized HPWL for the given placement.
     """
     
     # Create a dictionary to store block positions by their index [Increase computational efficiency]
@@ -453,3 +459,82 @@ def conn_HPWL(E, placed ):
 
     return total_distance / total_weight if total_weight != 0 else 0
 
+    
+
+def interface_crit(F, placed, min_x, min_y, max_x, max_y ):
+    """
+    Compute accessibility o(distance from associated side)f interfaces respect their associated sides.
+
+    Parameters:
+    ----------
+    F (list) : List of interface rectangles with the associated side to place
+    placed (list) : List of rectangles that have already been placed.
+    min_x (float) : Minimum x-coordinate in the placement area.
+    min_y (float) : Minimum y-coordinate in the placement area.
+    max_x (float) : Maximum x-coordinate in the placement area.
+    max_y (float) : Maximum y-coordinate in the placement area.
+    
+
+    Returns:
+    -------
+    int : Total normalized accessability.
+    """
+
+    total_distance = 0
+    total_weight = 0
+
+
+    for F_idx in range(len(F)):
+        idx, face, cost = F[F_idx]
+        for px, py, pw, ph, pidx, pvar in placed:
+            if idx == pidx:
+                if face == 1:
+                    total_distance += cost * (px - min_x)
+                elif face == 2:
+                    total_distance += cost * (max_y - (py + ph))
+                elif face == 3:
+                    total_distance += cost * (max_x - (px + pw))
+                elif face == 4:
+                    total_distance += cost * (py - min_y)
+                else:
+                    continue 
+                total_weight += cost
+                break
+
+    return total_distance / total_weight if total_weight != 0 else 0
+
+
+
+def proximity_crit(X, placed):
+    """
+    Compute distance between proximity bound rectangles
+
+    Parameters:
+    ----------
+    X (list) : List of proximity bounded rectangles 
+    placed (list) : List of rectangles that have already been placed.
+
+    Returns:
+    -------
+    int : Total normalized distance.
+    """
+    
+    prox_crit = 0
+    prox_norm = 0
+
+    
+    for X_idx in range(len(X)): 
+        i, j, cost = X[X_idx]
+        for px, py, pw, ph, pidx, pvar in placed:
+            if i == pidx:
+                for qx, qy, qw, qh, qidx, qvar in placed:
+                    if j == qidx:
+                        prox_crit += cost * ((px - qx)**2 + (py - qy)**2)
+                        prox_norm += cost
+                        break
+                        
+
+    return prox_crit / prox_norm if prox_norm != 0 else 0
+
+
+    

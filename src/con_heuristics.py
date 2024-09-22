@@ -283,7 +283,7 @@ def order_decoded_by_position(decoded, indices):
     return [decoded.index(p) for p in sorted_points]
 
 
-def evaluate_placement( E, E_indices_ptr, E_costs, placed, x, y, w, h, idx, var, cost_conn, cost_area, min_x, min_y, max_x, max_y):
+def evaluate_placement( E, E_indices_ptr, E_costs, F, X, placed, x, y, w, h, idx, var, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y):
     """
     Evaluate the placement of a rectangle based on area and connectivity criteria.
 
@@ -292,6 +292,8 @@ def evaluate_placement( E, E_indices_ptr, E_costs, placed, x, y, w, h, idx, var,
     E (list) : Dictionary of nets with associated cost
     E_indices_ptr (ffi object) : C param (cffi) containing indices of connection list E
     E_costs (ffi object) : C param (cffi) containing costs of connection list E
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     placed (list) : List of rectangles that have already been placed.
     x (float) : X-coordinate of the new rectangle's placement.
     y (float) : Y-coordinate of the new rectangle's placement.
@@ -301,6 +303,8 @@ def evaluate_placement( E, E_indices_ptr, E_costs, placed, x, y, w, h, idx, var,
     var (float) : Variant of the new rectangle .
     cost_conn (float) : Cost coefficient for connectivity.
     cost_area (float) : Cost coefficient for the area.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     min_x (float) : Minimum x-coordinate in the placement area.
     min_y (float) : Minimum y-coordinate in the placement area.
     max_x (float) : Maximum x-coordinate in the placement area.
@@ -310,17 +314,52 @@ def evaluate_placement( E, E_indices_ptr, E_costs, placed, x, y, w, h, idx, var,
     -------
     float: The score of the placement following area and connectivity criteria.
     """
+
+    max_x_tmp = max(max_x, x + w)
+    min_x_tmp = min(min_x, x)
+    max_y_tmp = max(max_y, y + h)
+    min_y_tmp = min(min_y, y)
     
-    min_width = max(max_x, x + w) - min(min_x, x)
-    min_height = max(max_y, y + h) - min(min_y, y)
+    min_width = max_x_tmp - min_x_tmp
+    min_height = max_y_tmp - min_y_tmp
+ 
+    face_crit = 0
+    for F_idx in range(len(F)):
+        i, face, cost_tmp = F[F_idx]
+        if i == idx:
+            if face == 1:
+                face_crit = max(x - min_x_tmp, 0)
+            elif face == 2:
+                face_crit = max(max_y_tmp - y, 0)
+            elif face == 3:
+                face_crit = max(max_x_tmp - x, 0)
+            elif face == 4:
+                face_crit = max(y - min_y_tmp, 0)
+            else:
+                continue  
+            break
+                    
+    prox_crit = 0
+    prox_norm = 0
+    for X_idx in range(len(X)): 
+        i, j, cost = X[X_idx]
+        if i == idx:
+            for px, py, pw, ph, pidx, pvar in placed:
+                if j == pidx:
+                    prox_crit += cost * ((x-px)**2 + (y-py)**2)
+                    prox_norm += cost
+
+    if prox_norm != 0:
+        prox_crit /= prox_norm
+    
 
     # Compute Half-Perimeter Wirelength with C acceleration
     conn_HPWL = deu.conn_HPWL_C(len(E), E_indices_ptr, E_costs, placed + [[x, y, w, h, idx, var]])
     
-    return cost_area * (min_width + min_height) + cost_conn * conn_HPWL
+    return cost_area * (min_width + min_height) + cost_conn * conn_HPWL + cost_face * face_crit + cost_prox * prox_crit 
 
 
-def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, P, decoded, placed_rectangles, pm, W_max, H_max, cost_conn, cost_area, min_x, min_y, max_x, max_y):
+def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, F, X, P, decoded, placed_rectangles, pm, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y):
     """
     Place rectangles that are part of a symmetric group.
 
@@ -333,6 +372,8 @@ def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, P, decoded
     E_costs (ffi object) : C param (cffi) containing costs of connection list E
     E_cache (list): Cached connection indeces where rectangles are involved
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     P (list) : List of available placing points.
     decoded (list) : List of rectangles (chromosomes decoded) that have not yet been placed in a feasible layout.
     placed (list) : List of rectangles that have already been placed.
@@ -341,6 +382,8 @@ def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, P, decoded
     H_max (float) : Maximum allowable height of the placement area.
     cost_conn (float) : Cost coefficient for connectivity.
     cost_area (float) : Cost coefficient for the area.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     min_x (float) : Minimum x-coordinate in the placement area.
     min_y (float) : Minimum y-coordinate in the placement area.
     max_x (float) : Maximum x-coordinate in the placement area.
@@ -432,13 +475,13 @@ def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, P, decoded
             # Try to place symmetric group with horizontal spacing to ensure minimum distance with who
             if can_place_rectangle(a, placed_rectangles, new_x + d, new_y, w, h, idx, W_max, H_max): 
                 score += evaluate_placement(
-                    E, E_indices_ptr, E_costs, placed_rectangles, new_x + d, new_y, w, h, idx, var, cost_conn, cost_area, min_x, min_y, max_x, max_y
+                    E, E_indices_ptr, E_costs, F, X, placed_rectangles, new_x + d, new_y, w, h, idx, var, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y
                 )
                 d_info = (d,  True)
             # Try to place symmetric group with vertically spacing to ensure minimum distance with who
             elif can_place_rectangle(a, placed_rectangles, new_x, new_y + d, w, h, idx, W_max, H_max): 
                 score += evaluate_placement(
-                    E, E_indices_ptr, E_costs, placed_rectangles, new_x, new_y + d, w, h, idx, var, cost_conn, cost_area, min_x, min_y, max_x, max_y
+                    E, E_indices_ptr, E_costs, F, X, placed_rectangles, new_x, new_y + d, w, h, idx, var, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y
                 )
                 d_info = (d,  False)
             else:
@@ -492,7 +535,7 @@ def place_symmetry_group(R, G, E, E_indices_ptr, E_costs, E_cache, a, P, decoded
 
 
 
-def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decoded, placed, rect_idx, W_max, H_max, pm, cost_conn, cost_area, min_x, min_y, max_x, max_y):
+def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, F, X, P, decoded, placed, rect_idx, W_max, H_max, pm, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y):
     """
     Place a rectangle that is not part of a symmetric group in the optimal position among available points.
 
@@ -504,6 +547,8 @@ def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decode
     E_costs (ffi object) : C param (cffi) containing costs of connection list E
     E_cache (list): Cached connection indeces where rectangles are involved
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     P (list) : List of available placing points.
     decoded (list) : List of rectangles (chromosomes decoded) that have not yet been placed in a feasible layout.
     placed (list) : List of rectangles that have already been placed.
@@ -513,6 +558,8 @@ def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decode
     pm (float) : Priority module 
     cost_conn (float) : Cost coefficient for connectivity.
     cost_area (float) : Cost coefficient for the area.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
     min_x (float) : Minimum x-coordinate in the placement area.
     min_y (float) : Minimum y-coordinate in the placement area.
     max_x (float) : Maximum x-coordinate in the placement area.
@@ -542,7 +589,7 @@ def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decode
         # Is position feasible with horizontal spacing? It is needed to ensure minimum distance
         if can_place_rectangle(a, placed, x + d, y, w, h, rect_idx, W_max, H_max):
             score = evaluate_placement(
-               E, E_indices_ptr, E_costs, placed, x + d, y, w, h, rect_idx, var, cost_conn, cost_area, min_x, min_y, max_x, max_y
+               E, E_indices_ptr, E_costs, F, X, placed, x + d, y, w, h, rect_idx, var, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y
             )
             if score < best_score:
                 best_score = score
@@ -553,7 +600,7 @@ def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decode
         # Is position feasible with vertical spacing?
         elif can_place_rectangle(a, placed, x, y + d, w, h, rect_idx, W_max, H_max):
             score = evaluate_placement(
-                E, E_indices_ptr, E_costs, placed, x, y + d, w, h, rect_idx, var, cost_conn, cost_area, min_x, min_y, max_x, max_y
+                E, E_indices_ptr, E_costs, F, X, placed, x, y + d, w, h, rect_idx, var, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y
             )
             if score < best_score:
                 best_score = score
@@ -583,7 +630,7 @@ def place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decode
 
 
 
-def heuristic_placement(R, G_list, E, a, P, decoded, placed, pm, W_max, H_max, cost_conn, cost_area):
+def heuristic_placement(R, G_list, E, a, F, X, P, decoded, placed, pm, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
     """
     Place rectangles using a constructive heuristic approach.
     
@@ -593,6 +640,8 @@ def heuristic_placement(R, G_list, E, a, P, decoded, placed, pm, W_max, H_max, c
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     P (list) : List of available placing points.
     decoded (list) : List of rectangles (chromosomes decoded) that have not yet been placed in a feasible layout.
     placed (list): List of rectangles that have already been placed.
@@ -601,6 +650,8 @@ def heuristic_placement(R, G_list, E, a, P, decoded, placed, pm, W_max, H_max, c
     H_max (float) : Maximum allowable height of the placement area.
     cost_conn (float) : Cost coefficient for connectivity.
     cost_area (float) : Cost coefficient for the area.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
 
     Returns:
     -------
@@ -668,8 +719,8 @@ def heuristic_placement(R, G_list, E, a, P, decoded, placed, pm, W_max, H_max, c
             # First rectangle in a symmetric group trigger placement of this last
             idx = min_symm_indices.index(rect_idx)
             place_symmetry_group(
-                R, G_list[idx], E, E_indices_ptr, E_costs, E_cache, a, P, decoded, placed, 
-                pm, W_max, H_max, cost_conn, cost_area, min_x, min_y, max_x, max_y
+                R, G_list[idx], E, E_indices_ptr, E_costs, E_cache, a, F, X, P, decoded, placed, 
+                pm, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y
             )
             if len(ord_decoded_indices) > 1: # Update next rectangles to place, due to priority-modulation
                 ord_decoded_indices = order_decoded_by_position(decoded,ord_decoded_indices[1:])
@@ -687,7 +738,7 @@ def heuristic_placement(R, G_list, E, a, P, decoded, placed, pm, W_max, H_max, c
 
         # Placement of non-symmetric group rectangles -----------------------------------------------
 
-        place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, P, decoded, placed, rect_idx, W_max, H_max, pm, cost_conn, cost_area, min_x, min_y, max_x, max_y)
+        place_non_symm_rectangle(R, E, E_indices_ptr, E_costs, E_cache, a, F, X, P, decoded, placed, rect_idx, W_max, H_max, pm, cost_conn, cost_area, cost_prox, cost_face, min_x, min_y, max_x, max_y)
         
         if len(ord_decoded_indices) > 1: # Update next rectangles to place, due to priority-modulation
             ord_decoded_indices = order_decoded_by_position(decoded,ord_decoded_indices[1:])

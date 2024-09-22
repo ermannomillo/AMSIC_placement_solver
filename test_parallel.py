@@ -20,7 +20,6 @@ import gurobi_model as lp
 import IO_util as iou
 
 
-
 def parse_arguments():
     """Parse console arguments."""
     
@@ -39,6 +38,8 @@ def parse_arguments():
     parser.add_argument('--seed', type=int, default=3, help='Random seed for reproducibility')
     parser.add_argument('--cost_conn', type=int, default=1, help='Connection criterion cost')
     parser.add_argument('--cost_area', type=int, default=1, help='Area criterion cost')
+    parser.add_argument('--cost_prox', type=int, default=1, help='Proximity criterion cost')
+    parser.add_argument('--cost_face', type=int, default=1, help='Interface criterion cost')
     parser.add_argument('--json_file', type=str, default=None, help='Specify the JSON file to load R, E, G_list, and a')
     parser.add_argument('--skip_cma', action='store_true', help='Flag to skip CMA-ES optimization step')
     parser.add_argument('--skip_local_search', action='store_true', help='Flag to skip local search steps')
@@ -75,10 +76,14 @@ if __name__ == "__main__":
     json_file = args.json_file  # Retrieve the json file argument
     cost_conn = args.cost_conn
     cost_area = args.cost_area
+    cost_face = args.cost_face
+    cost_prox = args.cost_prox
     tournament_size = args.tournament_size
 
     print(f"Area Cost               {cost_area:>5}")
     print(f"Connection Cost         {cost_conn:>5}")
+    print(f"Proximity Cost          {cost_prox:>5}")
+    print(f"Interface Cost          {cost_face:>5}")
     print(f"Population Size GA      {population_ga:>5}")
     print(f"Population Size CMA     {population_cma:>5}")
     print(f"Generations GA          {generations_ga:>5}")
@@ -109,7 +114,7 @@ if __name__ == "__main__":
         R, G_list, E, a = deu.load_data_json(json_file)
     else:
         # If no JSON file is provided, initialize random data
-        R, G_list, a = deu.init_rectangles_random(N, W_max, H_max, seed)
+        R, G_list, a, F, X = deu.init_rectangles_random(N, W_max, H_max, seed)
         E = deu.init_nets_random( N, int(N / 3), seed)
         if save_performance:
             deu.save_data_json(f"data/{dt.datetime.now()}.json", R, G_list, E, a)
@@ -125,14 +130,14 @@ if __name__ == "__main__":
     if profile:
         with cProfile.Profile() as profile:
             placed_ga, pm_ga, fitness_ga, ga_cpu_time, fitness_over_time_ga, chromosomes_over_time_ga, solution_ga = ga.run_ga(
-                R, G_list, E, a, N, childs, p_c, p_m, elite_size, tournament_size, generations_ga, population_ga, 3 * N + 1, W_max, H_max, cost_conn, cost_area, True
+                R, G_list, E, a, F, X, N, childs, p_c, p_m, elite_size, tournament_size, generations_ga, population_ga, 3 * N + 1, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, True
             )
         # Print profiling for GA
         pstats.Stats(profile).sort_stats('cumulative').print_stats()
     else:
     # GA execution
         placed_ga, pm_ga, fitness_ga, ga_cpu_time, fitness_over_time_ga, chromosomes_over_time_ga, solution_ga = ga.run_ga(
-            R, G_list, E, a, N, childs, p_c, p_m, elite_size, tournament_size, generations_ga, population_ga, 3 * N + 1, W_max, H_max, cost_conn, cost_area, False
+            R, G_list, E, a, F, X, N, childs, p_c, p_m, elite_size, tournament_size, generations_ga, population_ga, 3 * N + 1, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, False
         )
 
         # GA execution with profiling
@@ -149,7 +154,7 @@ if __name__ == "__main__":
     # Plot evolution and placement for GA
     if  plot:
         iou.plot_evolution_pca(chromosomes_over_time_ga, fitness_over_time_ga, generations_ga, 'images/evolution_ga.png')
-        iou.plot_placement(G_list, placed_ga, N, W_max, H_max, 'images/ga_placement.png')
+        iou.plot_placement(G_list,F, placed_ga, N, W_max, H_max, 'images/ga_placement.png')
 
 #---------------------------------------------------------------------------------------------------
 #    CMA-ES
@@ -161,13 +166,13 @@ if __name__ == "__main__":
         if profile:
             with cProfile.Profile() as profile:
                 placed_cma, pm_cma, fitness_cma, cma_cpu_time, fitness_over_time_cma, chromosomes_over_time_cma = cov.run_cma(
-                    R, G_list, E, a, N, W_max, H_max, population_cma, 3 * N + 1, initial_mean, generations_cma, sigma, cost_conn, cost_area, True
+                    R, G_list, E, a, F, X, N, W_max, H_max, population_cma, 3 * N + 1, initial_mean, generations_cma, sigma, cost_conn, cost_area, cost_prox, cost_face, True
                 )
 
             pstats.Stats(profile).sort_stats('cumulative').print_stats()
         else:
             placed_cma, pm_cma, fitness_cma, cma_cpu_time, fitness_over_time_cma, chromosomes_over_time_cma = cov.run_cma(
-                R, G_list, E, a, N, W_max, H_max, population_cma, 3 * N + 1, initial_mean, generations_cma, sigma, cost_conn, cost_area, False
+                R, G_list, E, a, F, X, N, W_max, H_max, population_cma, 3 * N + 1, initial_mean, generations_cma, sigma, cost_conn, cost_area, cost_prox, cost_face, False
             )
             if save_performance:
                 profiling_data = [
@@ -178,7 +183,7 @@ if __name__ == "__main__":
 
         if plot:
             iou.plot_evolution_pca(chromosomes_over_time_cma, fitness_over_time_cma, generations_cma, 'images/evolution_cma.png')
-            iou.plot_placement(G_list, placed_cma, N, W_max, H_max, 'images/cma_placement.png')
+            iou.plot_placement(G_list, F, placed_cma, N, W_max, H_max, 'images/cma_placement.png')
 
         if fitness_cma < fitness_ga:
             placed_meta = placed_cma
@@ -203,14 +208,14 @@ if __name__ == "__main__":
             with cProfile.Profile() as profile:
 
                 placed_ls_seq, fitness_ls_seq, rectangles_ls_seq = ls.local_search_sequence(
-                    R, G_list, E, a, N, placed_meta,fitness_meta, pm_meta, W_max, H_max,cost_conn, cost_area
+                    R, G_list, E, a, F, X, N, placed_meta,fitness_meta, pm_meta, W_max, H_max,cost_conn, cost_area, cost_prox, cost_face
                 )
                 
 
             pstats.Stats(profile).sort_stats('cumulative').print_stats()
             with cProfile.Profile() as profile:
                 placed_ls_lay, fitness_ls_lay = ls.local_search_layout(
-                    R, G_list, E, a, N, placed_ls_seq, rectangles_ls_seq, fitness_ls_seq, pm_meta, W_max, H_max, cost_conn, cost_area
+                    R, G_list, E, a, F, X, N, placed_ls_seq, rectangles_ls_seq, fitness_ls_seq, pm_meta, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face
                 )
 
             pstats.Stats(profile).sort_stats('cumulative').print_stats()
@@ -219,7 +224,7 @@ if __name__ == "__main__":
             # Local search - Sequence
             start_time = time.process_time()
             placed_ls_seq, fitness_ls_seq, rectangles_ls_seq = ls.local_search_sequence(
-                R, G_list, E, a, N, placed_meta, fitness_meta, pm_meta, W_max, H_max, cost_conn, cost_area
+                R, G_list, E, a, F, X, N, placed_meta, fitness_meta, pm_meta, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face
             )
             ls_seq_cpu_time = time.process_time() - start_time
     
@@ -227,7 +232,7 @@ if __name__ == "__main__":
             # Local search - Layout
             start_time = time.process_time()
             placed_ls_lay, fitness_ls_lay = ls.local_search_layout(
-                R, G_list, E, a, N, placed_ls_seq, rectangles_ls_seq, fitness_ls_seq, pm_meta, W_max, H_max, cost_conn, cost_area
+                R, G_list, E, a, F, X, N, placed_ls_seq, rectangles_ls_seq, fitness_ls_seq, pm_meta, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face
             )
             ls_lay_cpu_time = time.process_time() - start_time
             if save_performance:
@@ -245,8 +250,8 @@ if __name__ == "__main__":
                 iou.save_performance_data('data/Localsearch_layout_profiling_data.csv', profiling_data, ['N'])
 
         if plot:
-            iou.plot_placement(G_list, placed_ls_seq, N, W_max, H_max, 'images/ls_seq_placement.png')
-            iou.plot_placement(G_list, placed_ls_lay, N, W_max, H_max, 'images/ls_lay_placement.png')
+            iou.plot_placement(G_list, F, placed_ls_seq, N, W_max, H_max, 'images/ls_seq_placement.png')
+            iou.plot_placement(G_list, F, placed_ls_lay, N, W_max, H_max, 'images/ls_lay_placement.png')
 
         # Set the best placement after local search
         final_placement = placed_ls_lay
@@ -260,12 +265,12 @@ if __name__ == "__main__":
     if not skip_lp:
         if profile:
             with cProfile.Profile() as profile:
-                lp_placed = lp.AMS_placement_gurobi(R, G_list, E, a, N, final_placement, cost_conn, cost_area)
+                lp_placed = lp.AMS_placement_gurobi(R, G_list, E, a, F, X, N, final_placement, cost_conn, cost_area, cost_prox, cost_face)
             # Print profiling for Local Search Layout
             pstats.Stats(profile).sort_stats('cumulative').print_stats()
         else:
             start_time = time.process_time()
-            lp_placed = lp.AMS_placement_gurobi(R, G_list, E, a, N, final_placement, cost_conn, cost_area)
+            lp_placed = lp.AMS_placement_gurobi(R, G_list, E, a, F, X, N, final_placement, cost_conn, cost_area, cost_prox, cost_face)
             lp_cpu_time = time.process_time() - start_time
             if save_performance:
                 profiling_data = [['N', 'Gurobi CPU time', 'Date'], [N, lp_cpu_time, dt.datetime.now()]
@@ -273,5 +278,5 @@ if __name__ == "__main__":
                 iou.save_performance_data('data/LP_profiling_data.csv', profiling_data, ['N'])
         
         if plot:
-            iou.plot_placement(G_list, lp_placed, N, W_max, H_max, 'images/lp_placement.png')
+            iou.plot_placement(G_list, F, lp_placed, N, W_max, H_max, 'images/lp_placement.png')
 

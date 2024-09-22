@@ -3,7 +3,7 @@ from gurobipy import GRB
 import device_util as deu
 import IO_util as iou
 
-def AMS_placement_gurobi(R, G_list, E, a, N, placed, cost_conn, cost_area):
+def AMS_placement_gurobi(R, G_list, E, a, F, X, N, placed, cost_conn, cost_area, cost_prox, cost_face):
     """
     Optimize the placement of rectangles in the layout via Gurobi placement ILP model
     
@@ -13,10 +13,14 @@ def AMS_placement_gurobi(R, G_list, E, a, N, placed, cost_conn, cost_area):
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     placed (list) : List of rectangles representing the feasible layout of already placed components.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
 
     Returns:
     -------
@@ -133,12 +137,32 @@ def AMS_placement_gurobi(R, G_list, E, a, N, placed, cost_conn, cost_area):
     
     # Connectivity criterion
     L_conn = gp.quicksum(E[e][1] * (X_M[e] - X_m[e] + Y_M[e] - Y_m[e]) for e in range(len(E)))
+
+    L_face = 0
+    for F_idx in range(len(F)):
+        i, face, cost_tmp = F[F_idx]
+        if face == 1:
+            L_face += cost_tmp * x[i]
+        elif face == 2:
+            L_face += cost_tmp * (H - (y[i]+h[i]))
+        elif face == 3:
+            L_face += cost_tmp * (W - (x[i]+w[i]))
+        elif face == 4:
+            L_face += cost_tmp * y[i] 
+
+    L_prox = 0
+    for X_idx in range(len(X)): 
+        i, j, cost_tmp = X[X_idx]
+        L_prox += cost_tmp * ((x[i]-x[j])**2 + (y[i]-y[j])**2)
     
-    # Calculate the normalization constant (S_conn)
-    S_conn = sum(E[e][1] for e in range(len(E)))
+    
+    # Calculate the normalization constants
+    S_face = sum(F[idx][2] for idx in range(len(F)))
+    S_prox = sum(X[idx][2] for idx in range(len(X)))
+    S_conn = sum(E[idx][1] for idx in range(len(E)))
     
     # Objective function: Minimize area and HPWL criteria
-    model.setObjective(cost_area * (W + H) + cost_conn * (L_conn / S_conn), GRB.MINIMIZE)
+    model.setObjective(cost_area * (W + H) + cost_conn * (L_conn / S_conn) + cost_face * (L_face / S_face ) + cost_prox * (L_prox / S_prox ) , GRB.MINIMIZE)
 
     
     #-----------------------------------------------------------------------------------------------
@@ -255,6 +279,7 @@ def AMS_placement_gurobi(R, G_list, E, a, N, placed, cost_conn, cost_area):
             print("Minimum width:", min_width)
             print("Minimum height:", min_height)
             print("Objective function value - Gurobi:", model.objVal) 
+
             if model.status == 2:
                 print("Optimal solution")
 

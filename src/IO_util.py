@@ -57,7 +57,7 @@ def save_performance_data(csv_file, performance_data, primary_keys):
 
 
 
-def plot_placement(G_list, placed, N, W_max, H_max, name):
+def plot_placement(G_list, F, placed, N, W_max, H_max, name):
     """Plot and save on image spatial configuration of placement"""
     
     # Plotting the rectangles
@@ -84,10 +84,17 @@ def plot_placement(G_list, placed, N, W_max, H_max, name):
                 vec_G.append(j)
                 
         vec_G_global += vec_G
+
+    vec_F = []
+    for k in range(len(F)):
+        vec_F.append(F[k][0])
         
     for i in range(N):
         rect = plt.Rectangle((placed[i][0], placed[i][1]), placed[i][2], placed[i][3],
                                  linewidth=2, edgecolor='none', facecolor=colors[random.randint(0, N-1)])
+        if placed[i][4] in vec_F:
+            rect = plt.Rectangle((placed[i][0], placed[i][1]), placed[i][2], placed[i][3],
+                                 linewidth=2, edgecolor='g', facecolor=colors[random.randint(0, N-1)])            
         if placed[i][4] in vec_G_global :
         	rect = plt.Rectangle((placed[i][0], placed[i][1]), placed[i][2], placed[i][3],
                                  linewidth=2, edgecolor='r', facecolor=colors[random.randint(0, N-1)])

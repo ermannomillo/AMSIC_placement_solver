@@ -1,7 +1,7 @@
 import con_heuristics as che
 import device_util as deu
 
-def local_search_sequence(R, G_list, E, a, N, placed, fitness, pm, W_max, H_max, cost_conn, cost_area):
+def local_search_sequence(R, G_list, E, a, F, X, N, placed, fitness, pm, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
     """
     Performs a local search over sequences.
 
@@ -11,6 +11,8 @@ def local_search_sequence(R, G_list, E, a, N, placed, fitness, pm, W_max, H_max,
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     placed (list) : List of rectangles representing the feasible layout of already placed components.
     fitness (float) : The fitness value associated with the feasible layout (lower is better).
@@ -19,6 +21,8 @@ def local_search_sequence(R, G_list, E, a, N, placed, fitness, pm, W_max, H_max,
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
 
     Returns:
     -------
@@ -42,10 +46,14 @@ def local_search_sequence(R, G_list, E, a, N, placed, fitness, pm, W_max, H_max,
             tmp_var = rectangles[i][2]
             rectangles[i] = (rectangles[i][0], rectangles[i][1], k, 0)
             
-            tmp_placed = che.heuristic_placement(R, G_list, E, a, [(0, 0, None )], rectangles, [], pm, W_max, H_max,cost_conn, cost_area)
+            tmp_placed = che.heuristic_placement(R, G_list, E, a, F,X, [(0, 0, None )], rectangles, [], pm, W_max, H_max,cost_conn, cost_area, cost_prox, cost_face)
 
             min_width, min_height = deu.find_macrorectangle(tmp_placed)
-            tmp_fitness = cost_area * (min_width + min_height) + cost_conn * deu.conn_HPWL(E, tmp_placed) if len(tmp_placed) == N else 100000
+            L_conn = deu.conn_HPWL(E, tmp_placed)
+            L_face = deu.interface_crit(F, tmp_placed, 0, 0, min_width, min_height)
+            L_prox = deu.proximity_crit(X, tmp_placed)
+            
+            tmp_fitness = cost_area * (min_width + min_height) + cost_conn * L_conn + cost_face *  L_face +  cost_prox * L_prox if len(tmp_placed) == N else 100000
 
             if tmp_fitness < best_fitness:
                 best_placed = tmp_placed
@@ -60,7 +68,7 @@ def local_search_sequence(R, G_list, E, a, N, placed, fitness, pm, W_max, H_max,
     
     return best_placed, best_fitness, rectangles
 
-def local_search_layout(R, G_list, E, a, N, placed, decoded, fitness, pm, W_max, H_max, cost_conn, cost_area):
+def local_search_layout(R, G_list, E, a, F, X, N, placed, decoded, fitness, pm, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
     """
     Performs a local search over layout.
 
@@ -70,6 +78,8 @@ def local_search_layout(R, G_list, E, a, N, placed, decoded, fitness, pm, W_max,
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
     N (int) : The total number of rectangles to place.
     placed (list) : List of rectangles representing the feasible layout of already placed components.
     decoded (list) : List of rectangles (chromosomes decoded) that have not yet been placed in a feasible layout.
@@ -79,6 +89,8 @@ def local_search_layout(R, G_list, E, a, N, placed, decoded, fitness, pm, W_max,
     H_max (float) : The maximum allowable height for the layout.
     cost_conn (float) : The penalty cost associated with connection length between components.
     cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
 
     Returns:
     -------
@@ -109,10 +121,14 @@ def local_search_layout(R, G_list, E, a, N, placed, decoded, fitness, pm, W_max,
 
             tmp_var = decoded[i][2]
             decoded[i] = (decoded[i][0], decoded[i][1], k, 0)
-            new_placed = che.heuristic_placement(R, G_list, E, a, corners, decoded, tmp_placed, pm, W_max, H_max,cost_conn, cost_area) 
+            new_placed = che.heuristic_placement(R, G_list, E, a, F,X, corners, decoded, tmp_placed, pm, W_max, H_max,cost_conn, cost_area, cost_prox, cost_face) 
 
             min_width, min_height = deu.find_macrorectangle(new_placed)
-            tmp_fitness = cost_area * (min_width + min_height) + cost_conn * deu.conn_HPWL(E, new_placed) if len(new_placed) == N else 100000
+            L_conn = deu.conn_HPWL(E, new_placed)
+            L_face = deu.interface_crit(F, new_placed, 0, 0, min_width, min_height)
+            L_prox = deu.proximity_crit(X, new_placed)
+            
+            tmp_fitness = cost_area * (min_width + min_height) + cost_conn * L_conn  + cost_face * L_face +  cost_prox * L_prox if len(new_placed) == N else 100000
 
             if tmp_fitness < best_fitness:
                 best_placed = new_placed
