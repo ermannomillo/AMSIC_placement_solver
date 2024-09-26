@@ -2,6 +2,8 @@ import device_util as deu
 import IO_util as iou
 from cffi import FFI
 import numpy as np
+import math
+
 
 ffi = FFI()
 
@@ -346,8 +348,11 @@ def evaluate_placement( E, E_indices_ptr, E_costs, F, X, placed, x, y, w, h, idx
         if i == idx:
             for px, py, pw, ph, pidx, pvar in placed:
                 if j == pidx:
-                    prox_crit += cost * ((x-px)**2 + (y-py)**2)
-                    prox_norm += cost
+                    prox_crit += cost * (abs(x-px) + abs(y-py))
+                    prox_norm += abs(cost)
+                    break
+            break
+        
 
     if prox_norm != 0:
         prox_crit /= prox_norm

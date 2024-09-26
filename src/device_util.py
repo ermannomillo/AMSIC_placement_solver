@@ -34,7 +34,7 @@ def convert_keys_to_int(data):
 
 
 
-def save_data_json(filename, R, G_list, E, a):
+def save_data_json(filename, R, G_list, E, a, F,X):
     """
     Save placement context (R, G_list, E, a) to a JSON file.
     
@@ -44,6 +44,8 @@ def save_data_json(filename, R, G_list, E, a):
     G_list (list) : The list of symmetric groups.
     E (list) : Dictionary of nets with associated cost
     a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
 
     Returns:
     -------
@@ -55,7 +57,9 @@ def save_data_json(filename, R, G_list, E, a):
             'R': {str(k): v for k, v in R.items()},  # Convert dictionary keys to strings
             'G_list': {str(k): v for k, v in G_list.items()},  # Convert dictionary keys to strings
             'E': E,
-            'a': a
+            'a': a,
+            'F': F,
+            'X': X
         }
         # Serialize the data to JSON and write to the file
         json.dump(data, file, indent=4)
@@ -72,7 +76,7 @@ def load_data_json(filename):
     
     Returns:
     -------
-    Context :  (R, G_list, E, a) as deserialized objects.
+    Context :  (R, G_list, E, a, F, X) as deserialized objects.
     """
     
     with open(filename, 'r') as file:
@@ -82,7 +86,9 @@ def load_data_json(filename):
         G_list = convert_keys_to_int(data['G_list']) # Convert keys back to integers
         E = data['E']
         a = data['a']
-        return R, G_list, E, a
+        F = data['F']
+        X = data['X']
+        return R, G_list, E, a, F, X
 
 
 
@@ -153,6 +159,8 @@ def init_rectangles_random(N, W_max, H_max, SEED):
     list : Dictionary of variants.
     list : List of symmetry groups
     list : Matrix of minimum distance between rectangles
+    list : List of interface rectangles with the associated side to place
+    list : List of proximity bounded rectangles 
     """
 
     random.seed(SEED)
@@ -529,9 +537,10 @@ def proximity_crit(X, placed):
             if i == pidx:
                 for qx, qy, qw, qh, qidx, qvar in placed:
                     if j == qidx:
-                        prox_crit += cost * ((px - qx)**2 + (py - qy)**2)
-                        prox_norm += cost
+                        prox_crit += cost * (abs(px - qx)+ abs(py - qy))
+                        prox_norm += abs(cost)
                         break
+                break
                         
 
     return prox_crit / prox_norm if prox_norm != 0 else 0

@@ -57,7 +57,7 @@ def save_performance_data(csv_file, performance_data, primary_keys):
 
 
 
-def plot_placement(G_list, F, placed, N, W_max, H_max, name):
+def plot_placement(G_list, F, X, placed, N, W_max, H_max, name):
     """Plot and save on image spatial configuration of placement"""
     
     # Plotting the rectangles
@@ -65,8 +65,8 @@ def plot_placement(G_list, F, placed, N, W_max, H_max, name):
     ax2.set_xlim(0, W_max)
     ax2.set_ylim(0, H_max)
     ax2.set_aspect('equal')
-    ax2.set_xlabel('[nm]')
-    ax2.set_ylabel('[nm]')
+    ax2.set_xlabel('[μm]')
+    ax2.set_ylabel('[μm]')
         
 	# Generate a list of colors
     cmap = plt.get_cmap('magma')  # You can use any colormap you prefer
@@ -85,6 +85,14 @@ def plot_placement(G_list, F, placed, N, W_max, H_max, name):
                 
         vec_G_global += vec_G
 
+    vec_X = []
+    
+    for k in range(len(X)):
+        i, j, cost = X[k]
+        vec_X.append(i)
+        vec_X.append(j)
+
+
     vec_F = []
     for k in range(len(F)):
         vec_F.append(F[k][0])
@@ -98,6 +106,10 @@ def plot_placement(G_list, F, placed, N, W_max, H_max, name):
         if placed[i][4] in vec_G_global :
         	rect = plt.Rectangle((placed[i][0], placed[i][1]), placed[i][2], placed[i][3],
                                  linewidth=2, edgecolor='r', facecolor=colors[random.randint(0, N-1)])
+
+        if placed[i][4] in vec_X :
+        	rect = plt.Rectangle((placed[i][0], placed[i][1]), placed[i][2], placed[i][3],
+                                 linewidth=2, edgecolor='b', facecolor=colors[random.randint(0, N-1)])
         ax2.add_patch(rect)
 	
     fig2.savefig(name)

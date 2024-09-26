@@ -120,7 +120,7 @@ if __name__ == "__main__":
                         cma_population_size, cma_sigma = cma_hyperparams[j]
                         if not has_been_executed_cma(cma_df, N, cma_population_size, cma_sigma, 20):
                             command = (
-                                f"python3 test_parallel.py {N} "
+                                f"python3 test.py {N} "
                                 f"--tournament_size {ga_tournament} "
                                 f"--generations_ga {20} "
                                 f"--p_c {0.3} "
@@ -142,7 +142,7 @@ if __name__ == "__main__":
                     # Run only GA optimization with --skip_cma
                     if not has_been_executed_ga(ga_df, N, ga_population_size, ga_elite_size, 20, ga_child, 0.3, 0.3, ga_tournament ):
                         command = (
-                            f"python3 test_parallel.py {N} "
+                            f"python3 test.py {N} "
                             f"--population_ga {ga_population_size} "
                             f"--generations_ga {20} "
                             f"--tournament_size {ga_tournament} "
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         with ThreadPoolExecutor(max_workers=2) as executor:
             executor.map(run_command, commands)
     if args.profile:
-        command = (f"python3 test_parallel.py {40} "
+        command = (f"python3 test.py {40} "
             f"--profile " 
             f"--json_file=tmp/context_N{40}.json")
 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     
     df = pd.read_csv('data/CMA_profiling_data.csv')
 
-    #iou.poly_fit(df[(df['Sigma'] == 0.1) & (df['Population size'] == 50)], 'CMA CPU time', 'images/GA_fit.png', 5)
+    stu.poly_fit(df[(df['Sigma'] == 0.25) & (df['Population size'] == 100)], 'CMA CPU time', 'images/CMA_fit.png', 7)
     
     iou.plot_3d(df, 'N', 'CMA CPU time', 'Fitness',
                 title='3D Plot: CMA CPU Time, Fitness vs N', 
@@ -193,11 +193,9 @@ if __name__ == "__main__":
     dependent_var_1 = 'CMA CPU time'
     dependent_var_2 = 'Fitness'
     
-    # Running the function for GA CPU time
     print("\nDiagnostics for CMA CPU Time")
     stu.run_gls_with_diagnostics(df, dependent_var_1, independent_vars, use_glsar=True, standardize=True, use_newey_west=True)
     
-    # Running the function for Fitness
     print("\nDiagnostics for CMA Fitness")
     stu.run_gls_with_diagnostics(df, dependent_var_2, independent_vars, use_glsar=True, standardize=True, use_newey_west=True)
 
@@ -205,6 +203,8 @@ if __name__ == "__main__":
 
     # GA --------------------------------------------------------------------------------------
     df = pd.read_csv('data/GA_profiling_data.csv')
+
+    stu.poly_fit(df[(df['Elite size'] == 10) & (df['Population size'] == 100) & (df['Tournament size'] == 20)& (df['Childs'] == 100)], 'GA CPU time', 'images/GA_fit.png', 7)
     
     iou.plot_3d(df, 'N', 'GA CPU time', 'Fitness',
                 title='3D Plot: GA CPU Time, Fitness vs N', 
@@ -233,6 +233,7 @@ if __name__ == "__main__":
     iou.plot_3d(df, 'N', 'Elite size', 'GA CPU time',
                 title='3D Plot: Elite size, GA CPU time vs N', 
                 xlabel='N (Problem Size)', ylabel1='Elite size', ylabel2='GA CPU time [s]')
+    
         
     iou.plot_3d(df, 'N', 'Childs', 'GA CPU time',
                 title='3D Plot: Childs, GA CPU time vs N', 
@@ -246,11 +247,9 @@ if __name__ == "__main__":
     dependent_var_1 = 'GA CPU time'
     dependent_var_2 = 'Fitness'
     
-    # Running the function for GA CPU time
     print("\nDiagnostics for GA CPU Time")
     stu.run_gls_with_diagnostics(df, dependent_var_1, independent_vars, use_glsar=True, standardize=True, use_newey_west=True)
     
-    # Running the function for Fitness
     print("\nDiagnostics for GA Fitness")
     stu.run_gls_with_diagnostics(df, dependent_var_2, independent_vars, use_glsar=True, standardize=True, use_newey_west=True)
 

@@ -150,19 +150,39 @@ def AMS_placement_gurobi(R, G_list, E, a, F, X, N, placed, cost_conn, cost_area,
         elif face == 4:
             L_face += cost_tmp * y[i] 
 
+    # Compute Manhattan distance for proximity bound rectangle
+    # This ensure that the model still linear 
     L_prox = 0
     for X_idx in range(len(X)): 
         i, j, cost_tmp = X[X_idx]
-        L_prox += cost_tmp * ((x[i]-x[j])**2 + (y[i]-y[j])**2)
+        for px, py, pw, ph, pidx, pvar in placed:
+            if i == pidx:
+                for qx, qy, qw, qh, qidx, qvar in placed:
+                    if j == qidx:
+                        if px >= qx:
+                            L_prox += cost_tmp * (x[i]-x[j])
+                        else:
+                            L_prox += cost_tmp * (x[j]-x[i])
+                            
+                        if py >= qy:
+                            L_prox += cost_tmp * (y[i]-y[j])
+                        else:
+                            L_prox += cost_tmp * (y[j]-y[i])
+
+
     
     
     # Calculate the normalization constants
     S_face = sum(F[idx][2] for idx in range(len(F)))
-    S_prox = sum(X[idx][2] for idx in range(len(X)))
+    S_prox = sum(abs(X[idx][2]) for idx in range(len(X)))
     S_conn = sum(E[idx][1] for idx in range(len(E)))
+
+    crit_face = L_face / S_face if S_face != 0 else 0
+    crit_prox = L_prox / S_prox if S_prox != 0 else 0
+    crit_conn = L_conn / S_conn if S_conn != 0 else 0
     
     # Objective function: Minimize area and HPWL criteria
-    model.setObjective(cost_area * (W + H) + cost_conn * (L_conn / S_conn) + cost_face * (L_face / S_face ) + cost_prox * (L_prox / S_prox ) , GRB.MINIMIZE)
+    model.setObjective(cost_area * (W + H) + cost_conn * crit_conn + cost_face * crit_face + cost_prox * crit_prox , GRB.MINIMIZE)
 
     
     #-----------------------------------------------------------------------------------------------

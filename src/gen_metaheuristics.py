@@ -273,7 +273,7 @@ def generate_children(population, s, p_c, p_m, T, context):
     return L
 
 
-def genetic_algorithm(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, profile):
+def genetic_algorithm(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, profile, stats = True):
     """
     Run the genetic algorithm to generate and optimize a feasible solution
 
@@ -300,7 +300,8 @@ def genetic_algorithm(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, gene
     cost_area (float) : The penalty cost associated with the total area of the layout.
     cost_prox (float) : The penalty cost associated with distance of proximity constraints.
     cost_face (float) : The penalty cost associated with accessibility of interfaces.
-    profile (bool): Flag to determine if profiling is enabled.
+    profile (bool) : Flag to determine if profiling is enabled.
+    stats (bool) : Flag to determine if plot evolution stats
 
     Returns:
     -------
@@ -327,7 +328,7 @@ def genetic_algorithm(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, gene
         fitness_over_time.append([ind.fitness for ind in population])
         chromosomes_over_time.append([ind.chromosome for ind in population])
 
-        if i%10 == 0:
+        if i%10 == 0 and stats:
             print(f"Generation: {i}, Fitness: {min(population, key=lambda ind: ind.fitness).fitness}" )
     
     return population, fitness_over_time, chromosomes_over_time
@@ -365,6 +366,7 @@ def run_ga(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, po
     -------
     tuple: Contains the final placement, priority module , fitness value, CPU time, fitness over time, chromosomes over time, and the best chromosome (solution).
     """
+
     
     start_time = time.process_time()
     final_population, fitness_over_time, chromosomes_over_time = genetic_algorithm(
@@ -383,3 +385,57 @@ def run_ga(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, po
     print("\n")
     
     return placed_ga, pm_ga, fitness_ga, ga_cpu_time, fitness_over_time, chromosomes_over_time, solution_ga.chromosome
+
+def run_ga_multiobj(R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face):
+
+    """
+    Task wrapper to run GA and return non-weighted best multicriteria fitness
+    
+    Parameters:
+    ----------
+    R (list) : Dictionary  of available variant per each device or topological structures
+    G_list (list) : The list of symmetric groups.
+    E (list) : Dictionary of nets with associated cost
+    a (list) : Symmetric matrix of minimum distance between rectangles
+    F (list) : List of interface rectangles with the associated side to place
+    X (list) : List of proximity bounded rectangles 
+    N (int) : The total number of rectangles to place.
+    s (int) : Number of offspring to generate each generation.
+    p_c (float) : Crossover probability.
+    p_m (float) : Mutation probability.
+    elite_size (int) : Number of elite individuals to retain.
+    T (int) : Tournament size
+    generations (int) : Number of generations to run.
+    population_size (int) : Size of the population.
+    chromosome_length (int) : Length of the chromosome.
+    W_max (float) : The maximum allowable width for the layout.
+    H_max (float) : The maximum allowable height for the layout.
+    cost_conn (float) : The penalty cost associated with connection length between components.
+    cost_area (float) : The penalty cost associated with the total area of the layout.
+    cost_prox (float) : The penalty cost associated with distance of proximity constraints.
+    cost_face (float) : The penalty cost associated with accessibility of interfaces.
+
+    Returns:
+    -------
+    tuple: Contains the L_area, L_conn, L_prox, L_face
+    """
+    
+    final_population, fitness_over_time, chromosomes_over_time = genetic_algorithm(
+        R, G_list, E, a, F, X, N, s, p_c, p_m, elite_size, T, generations, population_size, chromosome_length, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face, False, stats=False
+    )
+    
+    solution_ga = min(final_population, key=lambda ind: ind.fitness)
+    rectangles_ga, pm_ga = deu.decode_chromosome(R, N, solution_ga.chromosome, W_max, H_max)
+    placed_ga = che.heuristic_placement(R, G_list, E, a, F, X, [(0, 0, None)], rectangles_ga, [], pm_ga, W_max, H_max, cost_conn, cost_area, cost_prox, cost_face)
+
+    min_width, min_height = deu.find_macrorectangle(placed_ga)
+    
+    L_area = min_width + min_height if len(placed_ga) == N else 100000
+    L_conn = deu.conn_HPWL(E, placed_ga) if len(placed_ga) == N else 100000
+    L_prox = deu.proximity_crit(X, placed_ga) if len(placed_ga) == N else 100000
+    L_face = deu.interface_crit(F, placed_ga, 0, 0, min_width, min_height) if len(placed_ga) == N else 100000
+
+    return L_area, L_conn, L_prox, L_face
+    
+
+    
