@@ -69,12 +69,13 @@ Output and Profiling:
 
 To run the optimization with 100 rectangles using specific population sizes for GA, CMA-ES, and NSGA-II:
 
-    python3 test.py --population_ga 50 --population_cma 30 --generations_ga 100 --generations_cma 50 --plot 100
+    python3 test.py --multiobj CMA --population_ga 50 --generations_ga 100 --cost_area 1 --cost_conn 5 --cost_prox 2 --cost_face 3 --plot
+
 
 This command places 100 rectangles with the following settings:
 
 - GA population of 50, CMA-ES population of 30, NSGA-II population of 20.
-- Runs for 100 GA generations, 50 CMA-ES generations, and 40 NSGA-II generations while plotting the results.
+- Runs for 100 GA generations, 50 CMA-ES generations, and 40 NSGA-II CMA-based generations while plotting the results.
     
 ## Acknowledgements
 
